@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowUpRight, Boxes, Check, ChevronRight, CirclePlay, Command, Globe2, LayoutDashboard, Menu, ShieldCheck, Sparkles, Users, X, Zap } from "lucide-react";
 
@@ -16,10 +16,16 @@ export default function Home() {
   const [idea,setIdea] = useState("");
   const [email,setEmail] = useState("");
   const [busy,setBusy] = useState(false);
+  const [cooldown,setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
   const [notice,setNotice] = useState("");
   const [error,setError] = useState("");
   async function start() {
-    if (!idea.trim() || !email.trim() || busy) return;
+    if (!idea.trim() || !email.trim() || busy || cooldown > 0) return;
     setBusy(true); setNotice(""); setError("");
     try {
       window.localStorage.setItem("nexora_pending_objective",idea.trim());
@@ -30,7 +36,13 @@ export default function Home() {
       });
       if (error) throw error;
       setNotice("A secure sign-in link has been sent. Open it on this device to create your workspace.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not send the sign-in link. Please try again."); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not send the sign-in link. Please try again.";
+      setError(message.toLowerCase().includes("email rate limit exceeded")
+        ? "Supabase has reached its built-in email sending limit (2 emails per hour). To send sign-in links reliably, configure a custom SMTP provider in Supabase Authentication → SMTP Settings. Please do not keep retrying; repeated attempts will not remove this limit."
+        : message);
+      setCooldown(60);
+    }
     finally { setBusy(false); }
   }
   return <main id="top">
@@ -42,7 +54,7 @@ export default function Home() {
     <section className="intro-section wrap" id="platform"><div className="section-label">THE PROBLEM WE&apos;RE SOLVING</div><div className="intro-grid"><h2>Good ideas get lost<br/>in <span className="muted-gradient">too many tabs.</span></h2><div><p>Planning in one tool. Building in another. Marketing somewhere else. Nexora is being shaped around a simpler idea: your work should move forward as one connected journey.</p><a className="text-link" href="#workflow">Discover the approach <ArrowUpRight size={16}/></a></div></div></section>
     <section className="modules-section" id="modules"><div className="wrap"><div className="modules-heading"><div><div className="section-label">ONE SPACE. EVERY STAGE.</div><h2>Everything moves<br/>better <span className="gradient">together.</span></h2></div><p>Six connected workspaces designed to help you go from a promising thought to meaningful progress.</p></div><div className="module-grid">{modules.map((m,i)=><article className="module-card" key={m.title}><div className="module-top"><span className="module-icon"><m.icon size={20}/></span><span className="module-number">0{i+1}</span></div><span className="module-tag">{m.tag}</span><h3>{m.title}</h3><p>{m.desc}</p><div className="module-arrow"><ArrowUpRight size={17}/></div></article>)}</div></div></section>
     <section className="workflow-section wrap" id="workflow"><div><div className="section-label">A CLEARER WAY FORWARD</div><h2>Start with what<br/>you <span className="gradient">want to do.</span></h2><p>Tell Nexora what you&apos;re working towards. The first experience helps you create a private workspace and keep practical next steps together.</p><a className="text-link" href="#start">Try the workspace starter <ArrowUpRight size={16}/></a></div><div className="steps-card">{["Share your objective|Describe the idea, challenge or outcome you have in mind.","Get a structured direction|Create a private workspace to organise your next actions.","Build and keep improving|Track tasks and move forward one step at a time."].map((s,i)=><div className="step" key={s}><span>0{i+1}</span><div><b>{s.split("|")[0]}</b><p>{s.split("|")[1]}</p></div><Check size={15}/></div>)}</div></section>
-    <section className="start-section" id="start"><div className="wrap start-wrap"><div className="start-copy"><div className="section-label light-label">YOUR NEXT CHAPTER STARTS HERE</div><h2>What are you<br/>trying to <span>make happen?</span></h2><p>Start with one sentence. You don&apos;t need the whole plan figured out.</p><div className="start-points"><span><Check size={15}/> Start with a simple objective</span><span><Check size={15}/> Find a clearer next step</span><span><Check size={15}/> Keep your work connected</span></div></div><div className="prompt-panel"><div className="prompt-head"><span className="prompt-spark"><Sparkles size={17}/></span><div><b>Let&apos;s shape your idea.</b><small>Tell us what you&apos;re working on.</small></div><span className="beta">EARLY PREVIEW</span></div><label htmlFor="idea">YOUR OBJECTIVE</label><textarea id="idea" value={idea} onChange={e=>setIdea(e.target.value)} placeholder="I want to build a platform that helps..." rows={4} maxLength={2000}/><label htmlFor="email">YOUR EMAIL</label><input id="email" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/><div className="prompt-suggestions"><span>TRY:</span>{["Launch a digital product","Validate a business idea","Build a website for my service"].map(x=><button key={x} onClick={()=>setIdea(x)}>{x}</button>)}</div><button className="button button-primary submit" onClick={start} disabled={!idea.trim()||!email.trim()||busy}>{busy?"Sending secure link…":"Create my workspace"} <ArrowUpRight size={16}/></button>{notice&&<div className="success"><Check size={15}/>{notice}</div>}{error&&<div className="error">{error}</div>}<div className="privacy"><ShieldCheck size={13}/> Your workspace is private to your account. Passwordless email sign-in.</div></div></div></section>
+    <section className="start-section" id="start"><div className="wrap start-wrap"><div className="start-copy"><div className="section-label light-label">YOUR NEXT CHAPTER STARTS HERE</div><h2>What are you<br/>trying to <span>make happen?</span></h2><p>Start with one sentence. You don&apos;t need the whole plan figured out.</p><div className="start-points"><span><Check size={15}/> Start with a simple objective</span><span><Check size={15}/> Find a clearer next step</span><span><Check size={15}/> Keep your work connected</span></div></div><div className="prompt-panel"><div className="prompt-head"><span className="prompt-spark"><Sparkles size={17}/></span><div><b>Let&apos;s shape your idea.</b><small>Tell us what you&apos;re working on.</small></div><span className="beta">EARLY PREVIEW</span></div><label htmlFor="idea">YOUR OBJECTIVE</label><textarea id="idea" value={idea} onChange={e=>setIdea(e.target.value)} placeholder="I want to build a platform that helps..." rows={4} maxLength={2000}/><label htmlFor="email">YOUR EMAIL</label><input id="email" name="nexora-signin-email" type="email" autoComplete="off" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/><div className="prompt-suggestions"><span>TRY:</span>{["Launch a digital product","Validate a business idea","Build a website for my service"].map(x=><button key={x} onClick={()=>setIdea(x)}>{x}</button>)}</div><button className="button button-primary submit" onClick={start} disabled={!idea.trim()||!email.trim()||busy||cooldown>0}>{busy?"Sending secure link…":cooldown>0?`Try again in ${cooldown}s`:"Create my workspace"} <ArrowUpRight size={16}/></button>{notice&&<div className="success"><Check size={15}/>{notice}</div>}{error&&<div className="error">{error}</div>}<div className="privacy"><ShieldCheck size={13}/> Your workspace is private to your account. Passwordless email sign-in.</div></div></div></section>
     <footer className="footer wrap"><a className="brand" href="#top"><span className="brand-mark"><Command size={19}/></span>NEXORA<span className="brand-dot">.</span></a><span>Make the next move matter.</span><small>© 2026 Nexora. A FutureWeb 2027 project.</small></footer>
   </main>;
 }
